@@ -3,49 +3,54 @@ package projector.utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.util.Optional;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 public class ProcessUtil {
     private static final Logger LOG = LoggerFactory.getLogger(ProcessUtil.class);
 
     public static void killOtherProcesses() {
         try {
-            // In Linux, the executable usually doesn't have an extension
-            String processName = "Projector"; 
+            String processName = "Projector.exe";
             String targetFolder = System.getProperty("user.dir");
-            
-            // Construct the absolute path to the executable we want to target
-            String targetPath = new File(targetFolder, processName).getAbsolutePath();
-            
-            // Get our own PID so we don't kill ourselves
-            long currentPid = ProcessHandle.current().pid();
+            // Step 1: Run the WMIC query
+            String query = "wmic process where \"name='" + processName + "'\" get ProcessId,ExecutablePath";
+            Process process = Runtime.getRuntime().exec(query);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
-            System.out.println("Scanning for instances of: " + targetPath);
+            String line;
+            boolean processFound = false;
 
-            // Iterate through all processes visible to the current user
-            ProcessHandle.allProcesses().forEach(process -> {
-                long pid = process.pid();
-                
-                // Skip the current process
-                if (pid == currentPid) return;
+            // Step 2: Parse the output
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("ExecutablePath") || line.startsWith("No Instance(s)")) {
+                    continue; // Skip headers and empty lines
+                }
 
-                Optional<String> command = process.info().command();
+                // Split the line into ExecutablePath and ProcessId
+                String[] details = line.split("\\s{2,}"); // WMIC separates columns by multiple spaces
+                if (details.length == 2) {
+                    String executablePath = details[0];
+                    String pid = details[1];
 
-                if (command.isPresent() && command.get().equals(targetPath)) {
-                    System.out.println("Found process in target folder: " + command.get() + " (PID: " + pid + ")");
-                    
-                    // Terminate the process (destroyForcibly is equivalent to kill -9)
-                    if (process.destroyForcibly()) {
+                    // Step 3: Check if the process is from the target folder
+                    if (executablePath.equalsIgnoreCase(targetFolder + "\\Projector.exe")) {
+                        processFound = true;
+                        System.out.println("Found process in target folder: " + executablePath + " (PID: " + pid + ")");
+
+                        // Step 4: Terminate the process
+                        String killCommand = "taskkill /PID " + pid + " /F";
+                        Runtime.getRuntime().exec(killCommand);
                         System.out.println("Terminated process: " + processName + " (PID: " + pid + ")");
-                    } else {
-                        LOG.warn("Failed to terminate process PID: " + pid);
                     }
                 }
-            });
-
+            }
+            if (!processFound) {
+                System.out.println("No process found with name '" + processName + "' running in folder: " + targetFolder);
+            }
         } catch (Exception e) {
-            LOG.error("Error while trying to kill other processes: " + e.getMessage(), e);
+            LOG.error(e.getMessage(), e);
         }
     }
 }

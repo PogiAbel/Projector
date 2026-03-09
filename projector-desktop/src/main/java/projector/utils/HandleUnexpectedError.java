@@ -14,7 +14,6 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.File;
 import java.util.ResourceBundle;
 
 import static java.lang.Thread.sleep;
@@ -139,21 +138,8 @@ public class HandleUnexpectedError {
                 new Thread(() -> {
                     try {
                         sleep(1000);
-                        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
-                        
-                        if (isWindows) {
-                            Runtime.getRuntime().exec("cmd /c Projector.exe");
-                        } else {
-                            // Linux/macOS logic
-                            File projectorFile = new File("Projector");
-                            if (projectorFile.exists()) {
-                                // Ensure the file has execution permissions on Linux
-                                projectorFile.setExecutable(true);
-                                Runtime.getRuntime().exec("./Projector");
-                            } else {
-                                LOG.error("Projector binary not found at: " + projectorFile.getAbsolutePath());
-                            }
-                        }
+                        String command = "cmd /c Projector.exe";
+                        Runtime.getRuntime().exec(command);
                     } catch (Exception e) {
                         logError(e);
                     }
